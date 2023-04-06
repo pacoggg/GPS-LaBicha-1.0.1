@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa de la Bicha</title>
+</head>
+<body>
+    <div id="map" style="height: 400px"></div>
+    <button id="last-pos-btn" onclick="showLastPosition()">Ver última posición</button>
+    <button id="last-ten-pos-btn" onclick="showLastTenPositions()">Ver últimas 10 posiciones</button>
+    <button id="refresh-btn" onclick="refreshPage()">Actualizar</button>
+    <div id="info-box"></div>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB1LThV0ezs2NhXaFEWrGdy7R3h7aNtaqw&callback=initMap" async defer></script>
+    <script>
+        let map;
+        let positions = [];
+        let markers = [];
+        let lastPositionData = {};
+        let response;
+        function initMap() {
+            const apiKey = "GIO7NQE7IRAEC42W";
+            const url = `https://api.thingspeak.com/channels/2090424/feeds.json?api_key=${apiKey}&results=100`;
+            const xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = () => {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    response = JSON.parse(xhr.responseText);
+                    response.feeds.forEach(feed => {
+                        const lat = parseFloat(feed.field1);
+                        const lng = parseFloat(feed.field2);
+                        const location = new google.maps.LatLng(lat, lng);
+                        positions.push(location);
+                    });
+                    
+                    const lastPosition = positions[positions.length - 1];
+                    map = new google.maps.Map(document.getElementById("map"), {
+                        center: lastPosition,
+                        zoom: 18
+                    });
+                    positions.forEach((position, i) => {
+                        const marker = new google.maps.Marker({
+                            position,
+                            map,
+                            label: (i + 1).toString()
+                        });
+                        markers.push(marker);
+                    });
+                    showLastPosition();
+                }
+            };
+            
+            xhr.open("GET", url, true);
+            xhr.send();
+
+        }
+
+        function showLastTenPositions() {
+            document.getElementById("last-ten-pos-btn").disabled = true;
+            document.getElementById("last-pos-btn").disabled = false;
+            markers.forEach(marker => {
+                marker.setVisible(true);
+            });
+            const lastTenPositions = positions.slice(-10);
+            markers.forEach(marker => {
+                if (!lastTenPositions.includes(marker.getPosition())) {
+                    marker.setVisible(false);
+                }
+            });
+            const lastPosition = lastTenPositions[lastTenPositions.length - 1];
+            map.setCenter(lastPosition);
+        }
+
+        
+        function showLastPosition() {
+            document.getElementById("last-pos-btn").disabled = true;
+            document.getElementById("last-ten-pos-btn").disabled = false;
+            markers.forEach(marker => {
+                marker.setVisible(false);
+            });
+            const lastPosition = positions[positions.length - 1];
+            markers[markers.length - 1].setVisible(true);
+            map.setCenter(lastPosition);
+
+            const lastFeed = response.feeds[response.feeds.length - 1];
+            const lastPositionData = {
+                lat: lastPosition.lat(),
+                lng: lastPosition.lng(),
+                date: lastFeed.created_at,
+                temperature: lastFeed.field3,
+                humidity: lastFeed.field4
+            };
+
+            const infoBox = document.getElementById("info-box");
+            infoBox.innerHTML = `
+                <h3>Última posición:</h3>
+                <ul>
+                    <li>Latitud: ${lastPositionData.lat}</li>
+                    <li>Longitud: ${lastPositionData.lng}</li>
+                    <li>Fecha y hora: ${new Date(lastPositionData.date).toLocaleString()}</li>
+                    ${lastPositionData.temperature ? `<li>Temperatura: ${lastPositionData.temperature}</li>` : ''}
+                    ${lastPositionData.humidity ? `<li>Humedad: ${lastPositionData.humidity}</li>` : ''}
+                </ul>
+            `;
+        }
+        function refreshPage() {
+        location.reload();
+        }
+
+
+    </script>
+    <!-- Añade este nuevo script -->
+    <script>
+        // Establecer el tiempo de actualización en milisegundos (por ejemplo, 5000 ms = 5 segundos)
+        const tiempoActualizacion = 30000;
+
+        // Función para actualizar la página automáticamente
+        function actualizarPagina() {
+            location.reload();
+        }
+
+        // Establecer el temporizador para actualizar la página después del tiempo de actualización especificado
+        setTimeout(actualizarPagina, tiempoActualizacion);
+    </script>
+
+</body>
+</html>
